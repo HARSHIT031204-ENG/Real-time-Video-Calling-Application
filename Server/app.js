@@ -2,7 +2,7 @@ import { Server } from "socket.io";
 
 const io = new Server(8000, {
     cors: {
-        origin: "https://gilma-sleetiest-lyn.ngrok-free.dev",
+        origin: "*",
         methods: ["POST", "GET", "PUT"],
         credentials: true,
     },
