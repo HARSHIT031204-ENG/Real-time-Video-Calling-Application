@@ -9,7 +9,14 @@ export const useSocket = () => {
 };
 
 export const SocketProvider = (props) => {
-  const socket = useMemo(() => io("video-calling-backend-nine.vercel.app"), []);
+  const socket = useMemo(
+    () =>
+      io("https://video-calling-backend-qmsa.onrender.com", {
+        transports: ["websocket", "polling"],
+        withCredentials: false,
+      }),
+    []
+  );
 
   return (
     <SocketContext.Provider value={socket}>
