@@ -4,15 +4,15 @@ import ReactPlayer from "react-player";
 import peer from "../services/peersrevice";
 import { useNavigate } from "react-router-dom";
 
-
 function Room() {
     const socket = useSocket();
     const [remoteSocketId, setRemoteSocketId] = useState(null);
     const [myStream, setMyStream] = useState();
     const [remoteStream, setRemoteStream] = useState();
+    const [isMicOn, setIsMicOn] = useState(true);
+    const [isCameraOn, setIsCameraOn] = useState(true);
 
-    const navigate = useNavigate()
-
+    const navigate = useNavigate();
 
     const handleCallUser = useCallback(async () => {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -65,6 +65,26 @@ function Room() {
         [sendStreams]
     );
 
+    const handleMicToggle = useCallback(() => {
+        if (!myStream) return;
+
+        const audioTrack = myStream.getAudioTracks()[0];
+        if (audioTrack) {
+            audioTrack.enabled = !audioTrack.enabled;
+            setIsMicOn(audioTrack.enabled);
+        }
+    }, [myStream]);
+
+    const handleCameraToggle = useCallback(() => {
+        if (!myStream) return;
+
+        const videoTrack = myStream.getVideoTracks()[0];
+        if (videoTrack) {
+            videoTrack.enabled = !videoTrack.enabled;
+            setIsCameraOn(videoTrack.enabled);
+        }
+    }, [myStream]);
+
     const handleNegoNeeded = useCallback(async () => {
         const offer = await peer.getOffer();
         socket.emit("peer:nego:needed", { offer, to: remoteSocketId });
@@ -98,9 +118,8 @@ function Room() {
         socket.emit("call:end", { to: remoteSocketId });
 
         console.log("Call ended");
-        
 
-        navigate("/")
+        navigate("/");
     }, [myStream, remoteStream, socket, remoteSocketId]);
 
     const handleNegoNeedIncomming = useCallback(
@@ -153,7 +172,7 @@ function Room() {
             if (myStream) myStream.getTracks().forEach((track) => track.stop());
             peer.peer.close();
             console.log("Remote user ended the call");
-            navigate("/")
+            navigate("/");
         });
 
         return () => socket.off("call:ended");
@@ -172,6 +191,51 @@ function Room() {
 
         return () => socket.off("call:ended");
     }, [socket, myStream, remoteStream]);
+
+    const handleScreenShare = useCallback(async () => {
+        try {
+            const screenStream = await navigator.mediaDevices.getDisplayMedia({
+                video: true,
+            });
+
+            const screenTrack = screenStream.getVideoTracks()[0];
+
+            // replace video track in peer connection
+            const sender = peer.peer
+                .getSenders()
+                .find((s) => s.track.kind === "video");
+            sender.replaceTrack(screenTrack);
+
+            // update your local preview
+            if (myStream) {
+                myStream.removeTrack(myStream.getVideoTracks()[0]);
+                myStream.addTrack(screenTrack);
+                setMyStream(screenStream);
+            }
+
+            // when screen sharing stops, switch back to camera
+            screenTrack.onended = async () => {
+                const cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: true,
+                });
+
+                const cameraTrack = cameraStream.getVideoTracks()[0];
+                const camSender = peer.peer
+                    .getSenders()
+                    .find((s) => s.track.kind === "video");
+                camSender.replaceTrack(cameraTrack);
+
+                cameraStream.getVideoTracks().forEach((track) => {
+                    myStream.addTrack(track);
+                });
+
+                setMyStream(cameraStream);
+            };
+        } catch (err) {
+            console.error("Screen share failed:", err);
+        }
+    }, [myStream]);
 
     return (
         <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-6 gap-6">
@@ -238,6 +302,49 @@ function Room() {
                     End Call
                 </button>
             )}
+
+            {myStream && (
+                <button
+                    onClick={handleScreenShare}
+                    className="px-6 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg font-semibold"
+                >
+                    Share Screen
+                </button>
+            )}
+
+            <div className="flex gap-4 justify-center my-4">
+                {/* Mic Toggle */}
+                <button
+                    onClick={handleMicToggle}
+                    className={`px-6 py-2 rounded-lg font-semibold ${
+                        isMicOn
+                            ? "bg-blue-600 hover:bg-blue-700"
+                            : "bg-gray-600"
+                    }`}
+                >
+                    {isMicOn ? "Mute Mic 🎤" : "Unmute Mic 🔇"}
+                </button>
+
+                {/* Camera Toggle */}
+                <button
+                    onClick={handleCameraToggle}
+                    className={`px-6 py-2 rounded-lg font-semibold ${
+                        isCameraOn
+                            ? "bg-blue-600 hover:bg-blue-700"
+                            : "bg-gray-600"
+                    }`}
+                >
+                    {isCameraOn ? "Camera Off 📷" : "Camera On 📷"}
+                </button>
+
+                {/* Screen Share */}
+                <button
+                    onClick={handleScreenShare}
+                    className="px-6 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg font-semibold"
+                >
+                    Share Screen 🖥
+                </button>
+            </div>
         </div>
     );
 }
