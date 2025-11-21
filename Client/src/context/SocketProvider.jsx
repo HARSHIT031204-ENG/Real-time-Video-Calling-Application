@@ -8,7 +8,6 @@ export const useSocket = () => {
   return socket;
 };
 
-
 export const SocketProvider = (props) => {
   const socket = useMemo(
     () =>
