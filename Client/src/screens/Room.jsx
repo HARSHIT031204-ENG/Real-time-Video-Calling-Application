@@ -101,26 +101,17 @@ function Room() {
     }, [handleNegoNeeded]);
 
     const handleEndCall = useCallback(() => {
-        // stop local stream
-        if (myStream) {
-            myStream.getTracks().forEach((track) => track.stop());
-        }
+    if (myStream) {
+        myStream.getTracks().forEach(track => (track.enabled = false)); // disable instead of stop
+    }
+    if (remoteStream) {
+        remoteStream.getTracks().forEach(track => (track.enabled = false));
+    }
 
-        // stop remote stream
-        if (remoteStream) {
-            remoteStream.getTracks().forEach((track) => track.stop());
-        }
-
-        // close WebRTC connection
-        peer.peer.close();
-
-        // 🔥 notify the other peer that call has ended
-        socket.emit("call:end", { to: remoteSocketId });
-
-        console.log("Call ended");
-
-        navigate("/");
-    }, [myStream, remoteStream, socket, remoteSocketId]);
+    peer.peer.close();
+    socket.emit("call:end", { to: remoteSocketId });
+    navigate("/");
+}, [myStream, remoteStream, socket, remoteSocketId]);
 
     const handleNegoNeedIncomming = useCallback(
         async ({ from, offer }) => {
@@ -218,6 +209,7 @@ function Room() {
                 const cameraStream = await navigator.mediaDevices.getUserMedia({
                     video: true,
                     audio: true,
+                    
                 });
 
                 const cameraTrack = cameraStream.getVideoTracks()[0];
